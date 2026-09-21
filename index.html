@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1f6b4f">
+  <meta name="description" content="筋トレのセット間に使える、日商簿記3級の五分類・借方貸方クイズ。">
+  <title>簿記3級 反射クイズ</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">BOOKKEEPING · LEVEL 3</p>
+        <h1>簿記3級 反射クイズ</h1>
+      </div>
+      <div class="today-chip" aria-label="今日の成績">
+        <span>今日</span>
+        <strong id="headerToday">0問正解</strong>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="メインメニュー">
+      <button class="tab is-active" data-tab="quiz" aria-selected="true">クイズ</button>
+      <button class="tab" data-tab="review" aria-selected="false">復習 <span id="reviewBadge" class="badge">0</span></button>
+      <button class="tab" data-tab="stats" aria-selected="false">学習記録</button>
+    </nav>
+
+    <main>
+      <section id="quizPanel" class="panel is-active" aria-labelledby="quizHeading">
+        <div class="quiz-toolbar">
+          <div>
+            <span class="label">出題モード</span>
+            <div class="segmented" id="modeButtons" role="group" aria-label="出題モード">
+              <button data-mode="mixed" class="is-active">ミックス</button>
+              <button data-mode="classify">5分類</button>
+              <button data-mode="side">借方・貸方</button>
+            </div>
+          </div>
+          <div class="session-score" aria-live="polite">
+            <span>今回</span>
+            <strong id="sessionScore">0 / 0</strong>
+            <small id="sessionStreak">連続 0</small>
+          </div>
+        </div>
+
+        <article class="question-card">
+          <div class="question-meta">
+            <span id="questionType" class="question-type">5分類</span>
+            <span id="questionCount">全186問</span>
+          </div>
+          <h2 id="quizHeading" class="sr-only">クイズ</h2>
+          <p id="questionText" class="question-text" aria-live="polite"></p>
+          <div id="answerGrid" class="answer-grid"></div>
+
+          <div id="feedback" class="feedback" aria-live="polite" hidden>
+            <div class="feedback-result">
+              <span id="feedbackIcon" aria-hidden="true"></span>
+              <div>
+                <strong id="feedbackTitle"></strong>
+                <p id="feedbackText"></p>
+              </div>
+            </div>
+            <div class="confidence-box">
+              <p>この問題の手応えは？</p>
+              <div class="confidence-buttons" role="group" aria-label="問題の手応え">
+                <button data-confidence="perfect"><span>◎</span>完璧</button>
+                <button data-confidence="unsure"><span>△</span>微妙</button>
+                <button data-confidence="review"><span>↺</span>見直し</button>
+              </div>
+            </div>
+          </div>
+          <button id="nextButton" class="primary-button" hidden>次の問題</button>
+        </article>
+
+        <p class="workout-note"><span aria-hidden="true">●</span> 1セット終わったら1問。答えの根拠まで思い出せれば十分です。</p>
+      </section>
+
+      <section id="reviewPanel" class="panel" aria-labelledby="reviewHeading" hidden>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">FOCUSED REVIEW</p>
+            <h2 id="reviewHeading">苦手だけを、もう一度</h2>
+          </div>
+          <button id="clearReview" class="text-button">分類をすべて解除</button>
+        </div>
+
+        <div class="review-summary">
+          <article class="review-card unsure-card">
+            <div><span class="review-symbol">△</span><p>微妙</p></div>
+            <strong id="unsureCount">0</strong>
+            <button data-review-mode="unsure">微妙だけ出題</button>
+          </article>
+          <article class="review-card revisit-card">
+            <div><span class="review-symbol">↺</span><p>見直し</p></div>
+            <strong id="revisitCount">0</strong>
+            <button data-review-mode="review">見直しだけ出題</button>
+          </article>
+        </div>
+        <button id="startWeakReview" class="primary-button wide">微妙・見直しをまとめて復習</button>
+        <div id="reviewEmpty" class="empty-state">
+          <span aria-hidden="true">✓</span>
+          <h3>復習待ちはありません</h3>
+          <p>クイズ後に「微妙」「見直し」を選ぶと、ここに追加されます。</p>
+        </div>
+      </section>
+
+      <section id="statsPanel" class="panel" aria-labelledby="statsHeading" hidden>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">DAILY PROGRESS</p>
+            <h2 id="statsHeading">学習記録</h2>
+          </div>
+          <button id="resetData" class="text-button danger">全記録を削除</button>
+        </div>
+
+        <div class="stat-grid">
+          <article class="stat-card featured"><span>今日の正解</span><strong id="todayCorrect">0</strong><small>問</small></article>
+          <article class="stat-card"><span>今日の正解率</span><strong id="todayRate">—</strong></article>
+          <article class="stat-card"><span>今日の回答</span><strong id="todayTotal">0</strong><small>問</small></article>
+          <article class="stat-card"><span>学習日数</span><strong id="studyDays">0</strong><small>日</small></article>
+        </div>
+
+        <article class="chart-card">
+          <div class="chart-heading">
+            <div><h3>直近7日間の推移</h3><p>棒：正解数　線：正解率</p></div>
+            <div class="legend"><span><i class="bar-key"></i>正解数</span><span><i class="line-key"></i>正解率</span></div>
+          </div>
+          <div class="chart-wrap"><canvas id="trendChart" role="img" aria-label="直近7日間の正解数と正解率"></canvas></div>
+        </article>
+
+        <article class="history-card">
+          <h3>日別の記録</h3>
+          <div id="historyList" class="history-list"></div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="confirmDialog">
+    <form method="dialog">
+      <h2>学習記録を削除しますか？</h2>
+      <p>正解数・自己評価・復習リストがすべて消えます。この操作は元に戻せません。</p>
+      <div class="dialog-actions">
+        <button value="cancel">キャンセル</button>
+        <button value="confirm" class="danger-button">削除する</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>
