@@ -119,7 +119,7 @@
       }
     };
     update();
-    timerId = window.setInterval(update, 100);
+    timerId = window.setInterval(update, 250);
   }
 
   function renderQuestionText() {
@@ -164,6 +164,7 @@
     $$('.confidence-buttons button').forEach(button => button.classList.remove('is-selected'));
     els.answerGrid.innerHTML = '';
     els.answerGrid.classList.toggle('two-options', current.type === 'side');
+    els.answerGrid.classList.toggle('classify-options', current.type === 'classify');
     const poolSize = eligibleQuestions().length;
     els.questionCount.textContent = reviewFilter ? `復習 ${poolSize}問` : `全${poolSize}問`;
 
@@ -411,7 +412,38 @@
       return;
     }
     const touch = event.touches[0];
-    swipeStart = { x: touch.clientX, y: touch.clientY };
+    swipeStart = {
+      x: touch.clientX,
+      y: touch.clientY,
+      time: performance.now(),
+      axis: null,
+      panel: $(`#${activeTab}Panel`)
+    };
+  }
+
+  function moveTabSwipe(event) {
+    if (!swipeStart || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    const dx = touch.clientX - swipeStart.x;
+    const dy = touch.clientY - swipeStart.y;
+    if (!swipeStart.axis && Math.max(Math.abs(dx), Math.abs(dy)) >= 7) {
+      swipeStart.axis = Math.abs(dx) > Math.abs(dy) * .9 ? 'x' : 'y';
+    }
+    if (swipeStart.axis !== 'x') return;
+    if (event.cancelable) event.preventDefault();
+    const offset = Math.sign(dx) * Math.min(Math.abs(dx) * .34, 46);
+    swipeStart.panel.classList.add('is-swiping');
+    swipeStart.panel.style.transform = `translateX(${offset}px)`;
+    swipeStart.panel.style.opacity = String(1 - Math.min(Math.abs(dx) / 900, .16));
+  }
+
+  function resetSwipePanel(panel) {
+    if (!panel) return;
+    panel.classList.remove('is-swiping');
+    panel.style.transition = 'transform .16s ease-out, opacity .16s ease-out';
+    panel.style.transform = '';
+    panel.style.opacity = '';
+    window.setTimeout(() => { panel.style.transition = ''; }, 170);
   }
 
   function finishTabSwipe(event) {
@@ -419,12 +451,22 @@
     const touch = event.changedTouches[0];
     const dx = touch.clientX - swipeStart.x;
     const dy = touch.clientY - swipeStart.y;
+    const elapsed = Math.max(1, performance.now() - swipeStart.time);
+    const velocity = Math.abs(dx) / elapsed;
+    const panel = swipeStart.panel;
+    const horizontal = swipeStart.axis === 'x' || Math.abs(dx) > Math.abs(dy) * .95;
     swipeStart = null;
-    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.35) return;
+    resetSwipePanel(panel);
+    if (!horizontal || (Math.abs(dx) < 32 && !(Math.abs(dx) >= 16 && velocity >= .22))) return;
     const tabs = ['quiz', 'review', 'stats'];
     const index = tabs.indexOf(activeTab);
     const nextIndex = dx < 0 ? index + 1 : index - 1;
     if (nextIndex >= 0 && nextIndex < tabs.length) switchTab(tabs[nextIndex]);
+  }
+
+  function cancelTabSwipe() {
+    if (swipeStart) resetSwipePanel(swipeStart.panel);
+    swipeStart = null;
   }
 
   $$('.tab').forEach(tab => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
@@ -446,8 +488,9 @@
     startTimer();
   });
   els.mainContent.addEventListener('touchstart', beginTabSwipe, { passive: true });
+  els.mainContent.addEventListener('touchmove', moveTabSwipe, { passive: false });
   els.mainContent.addEventListener('touchend', finishTabSwipe, { passive: true });
-  els.mainContent.addEventListener('touchcancel', () => { swipeStart = null; }, { passive: true });
+  els.mainContent.addEventListener('touchcancel', cancelTabSwipe, { passive: true });
   $$('.confidence-buttons button').forEach(button => button.addEventListener('click', () => rateQuestion(button.dataset.confidence, button)));
   els.nextButton.addEventListener('click', () => { if (rated) renderQuestion(); });
   $$('[data-review-mode]').forEach(button => button.addEventListener('click', () => startReview(button.dataset.reviewMode)));
