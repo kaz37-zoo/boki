@@ -28,7 +28,7 @@
     { id: `s:${account.name}:dec`, type: 'side', account, direction: '減少' }
   ]);
 
-  const defaultState = () => ({ history: {}, confidence: {} });
+  const defaultState = () => ({ history: {}, confidence: {}, settings: { showCategory: true, timeLimit: 0 } });
   let state = loadState();
   let mode = 'mixed';
   let reviewFilter = null;
@@ -37,6 +37,10 @@
   let answered = false;
   let rated = false;
   let session = { correct: 0, total: 0, streak: 0 };
+  let timerId = null;
+  let timerDeadline = 0;
+  let activeTab = 'quiz';
+  let swipeStart = null;
 
   const $ = selector => document.querySelector(selector);
   const $$ = selector => [...document.querySelectorAll(selector)];
@@ -49,13 +53,18 @@
     startWeakReview: $('#startWeakReview'), clearReview: $('#clearReview'), headerToday: $('#headerToday'),
     todayCorrect: $('#todayCorrect'), todayRate: $('#todayRate'), todayTotal: $('#todayTotal'),
     studyDays: $('#studyDays'), historyList: $('#historyList'), trendChart: $('#trendChart'),
-    confirmDialog: $('#confirmDialog')
+    confirmDialog: $('#confirmDialog'), questionCard: $('#questionCard'), categoryToggle: $('#categoryToggle'),
+    timerRange: $('#timerRange'), timerValue: $('#timerValue'), countdown: $('#countdown'),
+    countdownValue: $('#countdownValue'), timerTrack: $('#timerTrack'), timerFill: $('#timerFill'),
+    entryLabel: $('#entryLabel'), entryValue: $('#entryValue'), mainContent: $('#mainContent')
   };
 
   function loadState() {
     try {
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      return parsed && parsed.history && parsed.confidence ? parsed : defaultState();
+      if (!parsed || !parsed.history || !parsed.confidence) return defaultState();
+      const defaults = defaultState();
+      return { ...defaults, ...parsed, settings: { ...defaults.settings, ...(parsed.settings || {}) } };
     } catch (_) { return defaultState(); }
   }
 
@@ -74,6 +83,53 @@
   function sideFor(cls, direction) {
     const side = increaseSide[cls];
     return direction === '増加' ? side : (side === '借方' ? '貸方' : '借方');
+  }
+
+  function timerLabel(seconds) {
+    return seconds ? `${seconds}秒` : 'なし';
+  }
+
+  function stopTimer() {
+    if (timerId) window.clearInterval(timerId);
+    timerId = null;
+  }
+
+  function startTimer() {
+    stopTimer();
+    const seconds = Number(state.settings.timeLimit) || 0;
+    const enabled = seconds > 0 && !answered && activeTab === 'quiz';
+    els.countdown.hidden = !enabled;
+    els.timerTrack.hidden = !enabled;
+    els.countdown.classList.remove('is-urgent');
+    els.timerFill.classList.remove('is-urgent');
+    els.timerFill.style.width = '100%';
+    if (!enabled) return;
+    timerDeadline = Date.now() + seconds * 1000;
+    const update = () => {
+      const remainingMs = Math.max(0, timerDeadline - Date.now());
+      const remaining = Math.ceil(remainingMs / 1000);
+      els.countdownValue.textContent = String(remaining);
+      els.timerFill.style.width = `${remainingMs / (seconds * 1000) * 100}%`;
+      const urgent = remainingMs <= 5000;
+      els.countdown.classList.toggle('is-urgent', urgent);
+      els.timerFill.classList.toggle('is-urgent', urgent);
+      if (remainingMs <= 0) {
+        stopTimer();
+        answerQuestion(null, false, true);
+      }
+    };
+    update();
+    timerId = window.setInterval(update, 100);
+  }
+
+  function renderQuestionText() {
+    if (!current) return;
+    if (current.type === 'classify') {
+      els.questionText.textContent = `「${current.account.name}」はどのグループ？`;
+      return;
+    }
+    const hint = state.settings.showCategory ? `（${current.account.cls}）` : '';
+    els.questionText.textContent = `「${current.account.name}${hint}」が${current.direction}した。記入するのは？`;
   }
 
   function eligibleQuestions() {
@@ -102,6 +158,7 @@
     lastQuestionId = current.id;
     answered = false;
     rated = false;
+    els.questionCard.classList.remove('is-answered');
     els.feedback.hidden = true;
     els.nextButton.hidden = true;
     $$('.confidence-buttons button').forEach(button => button.classList.remove('is-selected'));
@@ -112,14 +169,15 @@
 
     if (current.type === 'classify') {
       els.questionType.textContent = '5分類';
-      els.questionText.textContent = `「${current.account.name}」はどのグループ？`;
+      renderQuestionText();
       classes.forEach(label => addAnswer(label, label === current.account.cls));
     } else {
       els.questionType.textContent = '増減 → 借方・貸方';
-      els.questionText.textContent = `「${current.account.name}（${current.account.cls}）」が${current.direction}した。記入するのは？`;
+      renderQuestionText();
       const answer = sideFor(current.account.cls, current.direction);
       ['借方', '貸方'].forEach(label => addAnswer(label, label === answer));
     }
+    startTimer();
   }
 
   function addAnswer(label, isCorrect) {
@@ -131,9 +189,13 @@
     els.answerGrid.append(button);
   }
 
-  function answerQuestion(selected, isCorrect) {
+  function answerQuestion(selected, isCorrect, timedOut = false) {
     if (answered) return;
     answered = true;
+    stopTimer();
+    els.countdown.hidden = true;
+    els.timerTrack.hidden = true;
+    els.questionCard.classList.add('is-answered');
     session.total += 1;
     session.streak = isCorrect ? session.streak + 1 : 0;
     if (isCorrect) session.correct += 1;
@@ -153,20 +215,22 @@
     const result = $('.feedback-result');
     result.classList.toggle('is-wrong', !isCorrect);
     els.feedbackIcon.textContent = isCorrect ? '✓' : '!';
-    els.feedbackTitle.textContent = isCorrect ? '正解' : 'ここを確認';
+    els.feedbackTitle.textContent = isCorrect ? '正解！' : (timedOut ? '時間切れ' : '不正解');
     if (current.type === 'classify') {
+      els.entryLabel.textContent = '分類';
+      els.entryValue.textContent = current.account.cls;
       els.feedbackText.textContent = `「${current.account.name}」は${current.account.cls}です。まず5分類を判断してから、左右を考えましょう。`;
     } else {
       const inc = increaseSide[current.account.cls];
       const answer = sideFor(current.account.cls, current.direction);
+      els.entryLabel.textContent = '仕訳';
+      els.entryValue.textContent = `${answer}に記入`;
       els.feedbackText.textContent = current.direction === '増加'
         ? `${current.account.cls}は増加すると${inc}。答えは${answer}です。`
         : `${current.account.cls}は増加すると${inc}なので、減少は反対側の${answer}です。`;
     }
     els.feedback.hidden = false;
-    els.nextButton.hidden = false;
-    els.nextButton.disabled = true;
-    els.nextButton.textContent = '手応えを選んで次へ';
+    els.nextButton.hidden = true;
     updateSession();
     saveState();
   }
@@ -176,6 +240,7 @@
     rated = true;
     state.confidence[current.id] = value;
     $$('.confidence-buttons button').forEach(item => item.classList.toggle('is-selected', item === button));
+    els.nextButton.hidden = false;
     els.nextButton.disabled = false;
     els.nextButton.textContent = '次の問題';
     saveState();
@@ -187,6 +252,9 @@
   }
 
   function switchTab(name) {
+    if (!['quiz', 'review', 'stats'].includes(name)) return;
+    if (activeTab === 'quiz' && name !== 'quiz') stopTimer();
+    activeTab = name;
     $$('.tab').forEach(tab => {
       const active = tab.dataset.tab === name;
       tab.classList.toggle('is-active', active);
@@ -199,6 +267,7 @@
     });
     if (name === 'stats') renderStats();
     if (name === 'review') refreshReview();
+    if (name === 'quiz' && current && !answered) startTimer();
   }
 
   function startReview(filter) {
@@ -266,7 +335,7 @@
     const maxCorrect = Math.max(5, ...data.map(d => d.correct));
     const slot = plotW / data.length;
 
-    ctx.font = '12px -apple-system, sans-serif';
+    ctx.font = '12px "BIZ UDPGothic", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.strokeStyle = '#e1e2d8';
@@ -326,6 +395,38 @@
     }).join('');
   }
 
+  function syncSettingsControls() {
+    els.categoryToggle.checked = Boolean(state.settings.showCategory);
+    els.timerRange.value = String(state.settings.timeLimit);
+    els.timerValue.textContent = timerLabel(Number(state.settings.timeLimit));
+  }
+
+  function swipeIsBlocked(target) {
+    return Boolean(target && typeof target.closest === 'function' && target.closest('.no-tab-swipe, button, input, label, canvas, dialog'));
+  }
+
+  function beginTabSwipe(event) {
+    if (event.touches.length !== 1 || swipeIsBlocked(event.target)) {
+      swipeStart = null;
+      return;
+    }
+    const touch = event.touches[0];
+    swipeStart = { x: touch.clientX, y: touch.clientY };
+  }
+
+  function finishTabSwipe(event) {
+    if (!swipeStart || !event.changedTouches.length) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - swipeStart.x;
+    const dy = touch.clientY - swipeStart.y;
+    swipeStart = null;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.35) return;
+    const tabs = ['quiz', 'review', 'stats'];
+    const index = tabs.indexOf(activeTab);
+    const nextIndex = dx < 0 ? index + 1 : index - 1;
+    if (nextIndex >= 0 && nextIndex < tabs.length) switchTab(tabs[nextIndex]);
+  }
+
   $$('.tab').forEach(tab => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
   $$('#modeButtons button').forEach(button => button.addEventListener('click', () => {
     mode = button.dataset.mode;
@@ -333,6 +434,20 @@
     $$('#modeButtons button').forEach(item => item.classList.toggle('is-active', item === button));
     renderQuestion();
   }));
+  els.categoryToggle.addEventListener('change', () => {
+    state.settings.showCategory = els.categoryToggle.checked;
+    renderQuestionText();
+    saveState();
+  });
+  els.timerRange.addEventListener('input', () => {
+    state.settings.timeLimit = Number(els.timerRange.value);
+    els.timerValue.textContent = timerLabel(state.settings.timeLimit);
+    saveState();
+    startTimer();
+  });
+  els.mainContent.addEventListener('touchstart', beginTabSwipe, { passive: true });
+  els.mainContent.addEventListener('touchend', finishTabSwipe, { passive: true });
+  els.mainContent.addEventListener('touchcancel', () => { swipeStart = null; }, { passive: true });
   $$('.confidence-buttons button').forEach(button => button.addEventListener('click', () => rateQuestion(button.dataset.confidence, button)));
   els.nextButton.addEventListener('click', () => { if (rated) renderQuestion(); });
   $$('[data-review-mode]').forEach(button => button.addEventListener('click', () => startReview(button.dataset.reviewMode)));
@@ -348,6 +463,7 @@
     state = defaultState();
     session = { correct: 0, total: 0, streak: 0 };
     reviewFilter = null;
+    syncSettingsControls();
     saveState();
     updateSession();
     renderStats();
@@ -356,6 +472,7 @@
   window.addEventListener('resize', () => { if (!$('#statsPanel').hidden) renderChart(); });
 
   els.questionCount.textContent = `全${questionBank.length}問`;
+  syncSettingsControls();
   updateSession();
   refreshSummaries();
   renderQuestion();

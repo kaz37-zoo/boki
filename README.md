@@ -9,9 +9,13 @@
 - 62勘定科目 × 3形式、合計186問
 - 回答後の「完璧・微妙・見直し」分類
 - 「微妙」「見直し」に分類した問題だけの復習
+- 勘定科目の分類ヒント（資産・費用など）の表示切替
+- 制限時間を「なし・10秒・20秒・30秒」からスライダーで設定
+- 左右スワイプによるタブ移動（制限時間スライダーとは操作領域を分離）
 - 今日の正解数・回答数・正解率
 - 日別履歴と直近7日間の推移グラフ
 - スマートフォン／PC対応
+- BIZ UDPGothicをアプリ内に同梱
 - サーバーやアカウント登録不要
 
 ## 使い方
@@ -35,7 +39,12 @@
 ├── styles.css
 ├── app.js
 ├── assets/
-│   └── favicon.svg
+│   ├── favicon.svg
+│   ├── fonts.css
+│   └── fonts/
+│       ├── biz-udpgothic-regular.woff2
+│       ├── biz-udpgothic-bold.woff2
+│       └── OFL.txt
 ├── .nojekyll
 ├── README.md
 └── LICENSE
@@ -47,4 +56,4 @@
 
 ## ライセンス
 
-MIT License
+アプリ本体はMIT Licenseです。同梱のBIZ UDPGothicはSIL Open Font License 1.1です。詳細は `assets/fonts/OFL.txt` を参照してください。

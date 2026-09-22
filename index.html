@@ -7,6 +7,7 @@
   <meta name="description" content="筋トレのセット間に使える、日商簿記3級の五分類・借方貸方クイズ。">
   <title>簿記3級 反射クイズ</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/fonts.css">
   <link rel="stylesheet" href="styles.css">
   <script src="app.js" defer></script>
 </head>
@@ -29,7 +30,7 @@
       <button class="tab" data-tab="stats" aria-selected="false">学習記録</button>
     </nav>
 
-    <main>
+    <main id="mainContent">
       <section id="quizPanel" class="panel is-active" aria-labelledby="quizHeading">
         <div class="quiz-toolbar">
           <div>
@@ -47,11 +48,32 @@
           </div>
         </div>
 
-        <article class="question-card">
+        <div class="quiz-settings no-tab-swipe" aria-label="出題設定">
+          <label class="hint-toggle" for="categoryToggle">
+            <input id="categoryToggle" type="checkbox" checked>
+            <span class="switch" aria-hidden="true"></span>
+            <span>分類ヒント</span>
+          </label>
+          <div class="timer-control">
+            <div class="timer-label">
+              <label for="timerRange">制限時間</label>
+              <output id="timerValue" for="timerRange">なし</output>
+            </div>
+            <input id="timerRange" type="range" min="0" max="30" step="10" value="0" aria-label="制限時間">
+            <div class="timer-ticks" aria-hidden="true"><span>なし</span><span>10秒</span><span>20秒</span><span>30秒</span></div>
+          </div>
+        </div>
+
+        <article id="questionCard" class="question-card">
           <div class="question-meta">
-            <span id="questionType" class="question-type">5分類</span>
+            <span class="today-question">今日の問題</span>
             <span id="questionCount">全186問</span>
           </div>
+          <div class="question-submeta">
+            <span id="questionType" class="question-type">5分類</span>
+            <span id="countdown" class="countdown" hidden><span aria-hidden="true">◷</span> <strong id="countdownValue">30</strong>秒</span>
+          </div>
+          <div id="timerTrack" class="timer-track" hidden><span id="timerFill"></span></div>
           <h2 id="quizHeading" class="sr-only">クイズ</h2>
           <p id="questionText" class="question-text" aria-live="polite"></p>
           <div id="answerGrid" class="answer-grid"></div>
@@ -61,8 +83,12 @@
               <span id="feedbackIcon" aria-hidden="true"></span>
               <div>
                 <strong id="feedbackTitle"></strong>
-                <p id="feedbackText"></p>
               </div>
+            </div>
+            <p class="entry-text"><strong id="entryLabel">仕訳</strong><span id="entryValue"></span></p>
+            <div class="remember-box">
+              <strong>ここを覚える</strong>
+              <p id="feedbackText"></p>
             </div>
             <div class="confidence-box">
               <p>この問題の手応えは？</p>
@@ -76,7 +102,7 @@
           <button id="nextButton" class="primary-button" hidden>次の問題</button>
         </article>
 
-        <p class="workout-note"><span aria-hidden="true">●</span> 1セット終わったら1問。答えの根拠まで思い出せれば十分です。</p>
+        <p class="workout-note"><span aria-hidden="true">●</span> 1セット終わったら1問。左右へスワイプするとタブを移動できます。</p>
       </section>
 
       <section id="reviewPanel" class="panel" aria-labelledby="reviewHeading" hidden>
